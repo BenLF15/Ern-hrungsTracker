@@ -109,26 +109,11 @@ const LABELS = { fat: "Fett", sat: "Gesättigte Fettsäuren", carb: "Kohlenhydra
 export function label(k) { return LABELS[k] || k; }
 
 // ------------------------------------------------------------------ Bedarfsrechner
-// Grundumsatz nach Mifflin-St Jeor (1990). Gesamtumsatz = Grundumsatz × PAL.
-// PAL-Werte nach DGE: Alltag/Beruf als Grundwert, Sport als Zuschlag. Die DGE nennt für
-// 4–5 × 30–60 min intensive Aktivität pro Woche einen Zuschlag von bis zu +0,3; hier wird
-// bewusst vorsichtig gerechnet, weil Aktivität erfahrungsgemäß überschätzt wird.
-// Die meisten Menschen mit Bürotätigkeit liegen bei 1,4–1,5.
-
-export const JOBS = [
-  { pal: 1.4, label: "Überwiegend sitzend (Büro, Studium, Homeoffice)" },
-  { pal: 1.5, label: "Sitzend mit etwas Bewegung (z. B. Wege zu Fuß, Haushalt)" },
-  { pal: 1.6, label: "Teils sitzend, teils stehend/gehend (z. B. Lehrkraft, Labor)" },
-  { pal: 1.8, label: "Überwiegend stehend/gehend (z. B. Verkauf, Pflege, Kellner)" },
-  { pal: 2.0, label: "Körperlich schwere Arbeit (z. B. Bau, Landwirtschaft)" },
-];
-export const SPORT = [
-  { add: 0, label: "Kein regelmäßiger Sport" },
-  { add: 0.05, label: "1–2 × pro Woche (30–60 min)" },
-  { add: 0.1, label: "3 × pro Woche (30–60 min)" },
-  { add: 0.2, label: "4–5 × pro Woche (30–60 min)" },
-  { add: 0.3, label: "Täglich intensiv / Leistungssport" },
-];
+// Grundumsatz nach Mifflin-St Jeor (1990). Gesamtumsatz = Grundumsatz × fester Alltagsfaktor.
+// Beruf und Sport fließen bewusst NICHT ein: Aktivität wird in der Praxis stark überschätzt
+// und treibt die Ziele unrealistisch hoch. Verwendet wird der DGE-Basiswert PAL 1,4
+// (überwiegend sitzender Alltag ohne gezielten Sport).
+export const PAL_BASE = 1.4;
 // Ziel: absoluter Zuschlag, gedeckelt auf einen Anteil des Gesamtumsatzes
 export const GOALS = [
   { id: "keep", label: "Gewicht halten", kcal: 0, pct: 0, proteinPerKg: 1.0 },
@@ -137,7 +122,6 @@ export const GOALS = [
   { id: "gain_slow", label: "Langsam zunehmen (ca. +0,2 kg/Woche)", kcal: 200, pct: 0.10, proteinPerKg: 1.4 },
   { id: "gain", label: "Zunehmen (ca. +0,3 kg/Woche)", kcal: 350, pct: 0.12, proteinPerKg: 1.4 },
 ];
-export const PAL_MAX = 2.2;
 
 /** Grundumsatz nach Mifflin-St Jeor (kcal/Tag). */
 export function bmrMifflin({ sex, age, weight, height }) {
@@ -146,15 +130,13 @@ export function bmrMifflin({ sex, age, weight, height }) {
 }
 
 /**
- * Vollständiger Zielvorschlag. profile: {sex, age, weight, height, job, sport, goal}.
+ * Vollständiger Zielvorschlag. profile: {sex, age, weight, height, goal}.
  * Gibt null bei unvollständigen Angaben zurück.
  */
 export function calcGoals(profile) {
   const bmr = bmrMifflin(profile);
   if (bmr == null || bmr <= 0) return null;
-  const job = isNum(+profile.job) && +profile.job > 0 ? +profile.job : 1.4;
-  const sport = isNum(+profile.sport) && +profile.sport >= 0 ? +profile.sport : 0;
-  const pal = Math.min(PAL_MAX, Math.round((job + sport) * 100) / 100);
+  const pal = PAL_BASE;
   const tdee = bmr * pal;
   const goal = GOALS.find((g) => g.id === profile.goal) || GOALS[0];
   const cap = tdee * goal.pct;
@@ -172,8 +154,8 @@ export function calcGoals(profile) {
   const protein = Math.round(refWeight * goal.proteinPerKg);
   const fat = Math.round((target * 0.30) / 9); // 30 % der Energie (DGE-Richtwert)
   const carb = Math.max(0, Math.round((target - protein * 4 - fat * 9) / 4));
-  // Getränke: DGE ca. 1,5 l/Tag, bei viel Bewegung mehr
-  const water = 1500 + Math.round(Math.max(0, pal - 1.5) / 0.2) * 250;
+  // Getränke: DGE-Richtwert ca. 1,5 l/Tag
+  const water = 1500;
   return { bmr, pal, tdee, delta, target, protein, fat, carb, water, fibre: 30, goal, notes };
 }
 
