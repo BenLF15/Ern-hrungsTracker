@@ -100,7 +100,7 @@ export const MEALS = [
 
 export const DEFAULT_SETTINGS = {
   goals: { kcal: 2000, protein: 75, carb: 250, fat: 67, fibre: 30, water: 2000 },
-  profile: { sex: "f", age: 30, weight: 65, height: 168, pal: 1.6 },
+  profile: { sex: "f", age: 30, weight: 65, height: 168, job: 1.4, sport: 0, goal: "keep" },
   ai: { apiKey: "", model: "claude-opus-5-5", verify: "all" },
   theme: "auto",
 };

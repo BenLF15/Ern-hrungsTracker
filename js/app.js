@@ -1,7 +1,7 @@
 // NährWert – Hauptansichten und Navigation.
 import { esc, $, $$, openSheet, closeSheet, toast, loadingHTML } from "./ui.js";
 import { loadDB, search } from "./db.js";
-import { scale, sum, fmt, fmtKcal, estimateNeeds } from "./nutrition.js";
+import { scale, sum, fmt, fmtKcal, calcGoals, JOBS, SPORT, GOALS } from "./nutrition.js";
 import {
   MEALS, GLASS_ML, getSettings, saveSettings, dayKey, parseDayKey, getDay, changeWater, allDayKeys,
   getCustomFoods, deleteCustomFood, exportAll, importAll, wipeAll, initStore, storageMode, lastSyncError,
@@ -328,7 +328,6 @@ function renderFoods() {
 function renderSettings() {
   const s = getSettings();
   const g = s.goals, p = s.profile;
-  const needs = estimateNeeds(p);
   view.innerHTML = `
     <h2 style="margin:16px 0 4px">Einstellungen</h2>
     <section class="card">
@@ -347,17 +346,22 @@ function renderSettings() {
 
     <section class="card">
       <h3>Bedarfsrechner</h3>
-      <p class="sub" style="margin-top:0">Schätzung nach Mifflin-St Jeor × PAL. Richtwert, ersetzt keine Beratung.</p>
+      <p class="sub" style="margin-top:0">Grundumsatz nach Mifflin-St Jeor × Aktivitätsfaktor (PAL nach DGE). Richtwert, ersetzt keine Beratung.</p>
       <div class="grid2">
         <label class="field">Geschlecht<select id="pS"><option value="f" ${p.sex === "f" ? "selected" : ""}>weiblich</option><option value="m" ${p.sex === "m" ? "selected" : ""}>männlich</option></select></label>
         <label class="field">Alter (Jahre)<input type="number" id="pA" value="${p.age}" min="1"></label>
         <label class="field">Gewicht (kg)<input type="number" id="pW" value="${p.weight}" min="1" step="0.1"></label>
         <label class="field">Größe (cm)<input type="number" id="pH" value="${p.height}" min="1"></label>
       </div>
-      <label class="field">Aktivität (PAL)<select id="pPal">
-        ${[[1.2, "1,2 – sitzend, kaum Bewegung"], [1.4, "1,4 – überwiegend sitzend"], [1.6, "1,6 – sitzend, zeitweise gehend/stehend"], [1.8, "1,8 – überwiegend gehend/stehend"], [2.0, "2,0 – körperlich anstrengend"], [2.2, "2,2 – sehr anstrengend/Leistungssport"]].map(([v, l]) => `<option value="${v}" ${+p.pal === v ? "selected" : ""}>${l}</option>`).join("")}
+      <label class="field">Beruf / Alltag<select id="pJob">
+        ${JOBS.map((j) => `<option value="${j.pal}" ${+p.job === j.pal ? "selected" : ""}>${esc(j.label)}</option>`).join("")}
       </select></label>
-      <label class="field">Ziel<select id="pGoal"><option value="0">Gewicht halten</option><option value="-500">Abnehmen (−500 kcal)</option><option value="-250">Langsam abnehmen (−250 kcal)</option><option value="300">Zunehmen (+300 kcal)</option></select></label>
+      <label class="field">Sport<select id="pSport">
+        ${SPORT.map((x) => `<option value="${x.add}" ${+p.sport === x.add ? "selected" : ""}>${esc(x.label)}</option>`).join("")}
+      </select></label>
+      <label class="field">Ziel<select id="pGoal">
+        ${GOALS.map((g) => `<option value="${g.id}" ${p.goal === g.id ? "selected" : ""}>${esc(g.label)}</option>`).join("")}
+      </select></label>
       <div id="needs" class="notice"></div>
       <button class="btn block" id="applyNeeds">Als Tagesziele übernehmen</button>
     </section>
@@ -410,20 +414,20 @@ function renderSettings() {
   });
 
   const calc = () => {
-    const prof = { sex: $("#pS").value, age: num("#pA"), weight: num("#pW"), height: num("#pH"), pal: num("#pPal") };
-    const r = estimateNeeds(prof);
-    if (!r) { $("#needs").textContent = "Bitte alle Werte eingeben."; return null; }
-    const target = Math.round((r.tdee + num("#pGoal")) / 10) * 10;
-    // Makro-Vorschlag: Eiweiß 1,0 g/kg (DGE-Referenz 0,8 g/kg; leicht erhöht), Fett 30 % der Energie, Rest Kohlenhydrate
-    const protein = Math.round(prof.weight * 1.0);
-    const fat = Math.round((target * 0.30) / 9);
-    const carb = Math.max(0, Math.round((target - protein * 4 - fat * 9) / 4));
-    // DGE-Referenzwert Wasserzufuhr durch Getränke (Erwachsene): ca. 1,5 l/Tag; bei hoher Aktivität mehr
-    const water = 1500 + Math.max(0, Math.round((prof.pal - 1.6) / 0.2)) * 250;
-    $("#needs").innerHTML = `Grundumsatz ≈ <b>${fmtKcal(r.bmr)} kcal</b>, Gesamtumsatz ≈ <b>${fmtKcal(r.tdee)} kcal</b>.<br>Vorschlag: <b>${fmtKcal(target)} kcal</b> · Eiweiß ${protein} g · KH ${carb} g · Fett ${fat} g · Wasser ${fmt(water / 1000, 2)} l`;
-    return { prof, goals: { kcal: target, protein, carb, fat, water, fibre: 30 } };
+    const prof = { sex: $("#pS").value, age: num("#pA"), weight: num("#pW"), height: num("#pH"), job: num("#pJob"), sport: num("#pSport"), goal: $("#pGoal").value };
+    const r = calcGoals(prof);
+    if (!r) { $("#needs").textContent = "Bitte Alter, Gewicht und Größe eingeben."; return null; }
+    const sign = r.delta > 0 ? "+" : r.delta < 0 ? "−" : "±";
+    $("#needs").innerHTML = `<b>Rechenweg</b><br>
+      Grundumsatz ${fmtKcal(r.bmr)} kcal × PAL ${fmt(r.pal, 2)} = Gesamtumsatz <b>${fmtKcal(r.tdee)} kcal</b><br>
+      ${esc(r.goal.label)}: ${sign} ${fmtKcal(Math.abs(r.delta))} kcal → <b>${fmtKcal(r.target)} kcal/Tag</b>
+      ${r.notes.length ? `<br><span class="muted">${r.notes.map(esc).join(" ")}</span>` : ""}
+      <br>Eiweiß ${r.protein} g · KH ${r.carb} g · Fett ${r.fat} g · Getränke ${fmt(r.water / 1000, 2)} l
+      ${r.target > 3000 ? `<br><span class="muted">Über 3.000 kcal ist nur bei körperlich schwerer Arbeit oder sehr viel Sport realistisch – prüfe die Aktivitätsangaben.</span>` : ""}
+      <br><span class="muted">Tipp: Nach 2–3 Wochen Gewichtsverlauf prüfen und das Ziel um 100–200 kcal anpassen.</span>`;
+    return { prof, goals: { kcal: r.target, protein: r.protein, carb: r.carb, fat: r.fat, water: r.water, fibre: r.fibre } };
   };
-  ["#pS", "#pA", "#pW", "#pH", "#pPal", "#pGoal"].forEach((id) => $(id).addEventListener("input", calc));
+  ["#pS", "#pA", "#pW", "#pH", "#pJob", "#pSport", "#pGoal"].forEach((id) => $(id).addEventListener("input", calc));
   calc();
   $("#applyNeeds").addEventListener("click", () => {
     const r = calc(); if (!r) return;
