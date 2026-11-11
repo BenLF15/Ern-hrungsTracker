@@ -4,3 +4,4 @@ __pycache__/
 package/
 .DS_Store
 dist/
+dist-chat/

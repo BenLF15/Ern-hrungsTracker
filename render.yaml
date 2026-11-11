@@ -1,0 +1,32 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> dieses Repository wählen.
+# Die App ist rein statisch und wird als "Static Site" ausgeliefert (kostenlos, mit HTTPS und CDN).
+services:
+  - type: web
+    runtime: static
+    name: naehrwert
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(self), microphone=(), geolocation=()
+      # Service Worker, HTML und Manifest immer frisch laden, damit Updates sofort ankommen
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      - path: /manifest.webmanifest
+        name: Cache-Control
+        value: no-cache

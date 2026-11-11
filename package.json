@@ -1,0 +1,24 @@
+{
+  "name": "naehrwert",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NährWert – Ernährungs- und Kalorientracker (statische Web-App mit amtlichen Nährwertdaten, Barcode-Scan und KI-Fotoerkennung)",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "start": "node tools/serve.mjs",
+    "dev": "node tools/serve.mjs --root .",
+    "build:chat": "node tools/build-artifact.mjs dist-chat/naehrwert-chat.html",
+    "build:vendor": "node tools/build-vendor.mjs",
+    "check": "node tools/build.mjs --check"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@zxing/browser": "0.2.1",
+    "@zxing/library": "0.23.0",
+    "esbuild": "0.28.2"
+  }
+}

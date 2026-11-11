@@ -56,14 +56,34 @@ einträgt – im Code ist kein Schlüssel enthalten.
 
 ## Starten
 
-Statische Website ohne Build-Schritt. Kamera und Service Worker brauchen HTTPS oder `localhost`.
+Statische Web-App. Kamera und Service Worker brauchen HTTPS oder `localhost`.
+Für Build und Server werden nur Node-Bordmittel benötigt (Node ≥ 18, kein `npm install`).
 
-```sh
-python3 -m http.server 8000   # dann http://localhost:8000
-```
+| Befehl | Zweck |
+|---|---|
+| `npm run dev` | Repository direkt lokal ausliefern: http://localhost:8000 |
+| `npm run check` | Prüft Dateien, Datenbank und Modul-Importe |
+| `npm run build` | Baut die auslieferbare App nach `dist/` (Service-Worker-Version = Inhalts-Hash) |
+| `npm start` | Liefert `dist/` aus (Port aus `PORT`, Standard 8000) |
+| `npm run build:chat` | Einzeldatei-Version für den Claude-Chat (benötigt `npm install`) |
+| `npm run build:vendor` | Bibliotheken in `vendor/` neu bündeln (benötigt `npm install`) |
 
-Für das Handy z. B. über **GitHub Pages** veröffentlichen (Settings → Pages → Branch wählen) und die
-Seite über „Zum Startbildschirm hinzufügen“ als App installieren.
+### Auf Render veröffentlichen
+
+**Variante A – Static Site (empfohlen, kostenlos):**
+Dashboard → **New → Blueprint** → dieses Repository wählen. `render.yaml` richtet alles ein.
+Oder manuell **New → Static Site** mit:
+
+* Branch: der Branch mit dem Code
+* Build Command: `npm run build`
+* Publish Directory: `dist`
+
+**Variante B – Web Service (Node):**
+**New → Web Service**, Runtime *Node*, Build Command `npm run build`, Start Command `npm start`.
+
+Render stellt HTTPS bereit – damit funktionieren Kamera, Barcode-Scan und die Installation als App
+(„Zum Startbildschirm hinzufügen“). Nach jedem Push baut Render neu; installierte Apps laden die neue
+Version beim nächsten Öffnen.
 
 ## Version im Claude-Chat
 
@@ -76,7 +96,7 @@ Artifact im Claude-Chat läuft. Dort gilt:
   nur in der Web-App. Ersatz: Foto hochladen bzw. Kamera-App, Nährwerttabelle fotografieren.
 
 ```sh
-node tools/build-artifact.mjs dist/naehrwert-chat.html   # benötigt esbuild
+npm install && npm run build:chat   # -> dist-chat/naehrwert-chat.html
 ```
 
 ## Aufbau
@@ -97,6 +117,10 @@ data/foods.json              Generierte Lebensmitteldatenbank
 vendor/                      Gebündelt: Anthropic TypeScript SDK (MIT), ZXing (Apache 2.0)
 tools/build_db.py            Erzeugt data/foods.json
 tools/build-artifact.mjs     Erzeugt die Einzeldatei-Version für den Chat
+tools/build.mjs              Build nach dist/ (npm run build)
+tools/serve.mjs              Statischer Server (npm start / npm run dev)
+tools/build-vendor.mjs       Bündelt vendor/ neu
+package.json, render.yaml    Build-Skripte und Render-Konfiguration
 ```
 
 ## Lizenzen

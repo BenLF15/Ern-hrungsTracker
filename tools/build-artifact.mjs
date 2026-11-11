@@ -10,7 +10,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const out = resolve(process.argv[2] || resolve(root, "dist/naehrwert-chat.html"));
+const out = resolve(process.argv[2] || resolve(root, "dist-chat/naehrwert-chat.html"));
 const esbuild = await import(process.env.ESBUILD_PATH || "esbuild");
 
 const res = await esbuild.build({
