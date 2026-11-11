@@ -1,0 +1,422 @@
+[
+ {
+  "name": "Haferflocken",
+  "kcal": 348,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 C133000 (Hafer Flocken)"
+ },
+ {
+  "name": "Reis (gekocht)",
+  "kcal": 117,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 C352032 (Reis poliert, gekocht)"
+ },
+ {
+  "name": "Reis (roh)",
+  "kcal": 351,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 C352000 (Reis poliert, roh)"
+ },
+ {
+  "name": "Nudeln (gekocht)",
+  "kcal": 146,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 E401032 (Teigwaren eifrei, gekocht)"
+ },
+ {
+  "name": "Nudeln (roh)",
+  "kcal": 346,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 E401000 (Teigwaren eifrei, roh)"
+ },
+ {
+  "name": "Vollkornnudeln (gekocht)",
+  "kcal": 130,
+  "unit": "g",
+  "category": "Getreide",
+  "source": "BLS 4.0 E500032 (Vollkornteigwaren eifrei, gekocht)"
+ },
+ {
+  "name": "Kartoffeln (gekocht)",
+  "kcal": 76,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 K110132 (Kartoffel geschält, gekocht)"
+ },
+ {
+  "name": "Süßkartoffel (gekocht)",
+  "kcal": 65,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 K420132 (Batate/Süßkartoffel, gekocht)"
+ },
+ {
+  "name": "Vollkornbrot",
+  "kcal": 210,
+  "unit": "g",
+  "category": "Brot",
+  "source": "BLS 4.0 B101000 (Vollkornbrot)"
+ },
+ {
+  "name": "Weizenbrötchen",
+  "kcal": 280,
+  "unit": "g",
+  "category": "Brot",
+  "source": "BLS 4.0 B511000 (Weizenbrötchen)"
+ },
+ {
+  "name": "Toastbrot",
+  "kcal": 261,
+  "unit": "g",
+  "category": "Brot",
+  "source": "BLS 4.0 B314000 (Weizentoastbrot/Buttertoastbrot)"
+ },
+ {
+  "name": "Roggenmischbrot",
+  "kcal": 218,
+  "unit": "g",
+  "category": "Brot",
+  "source": "BLS 4.0 B271000 (Roggenmischbrot)"
+ },
+ {
+  "name": "Hähnchenbrust (roh)",
+  "kcal": 109,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 V416100 (Hähnchen Brustfilet, roh)"
+ },
+ {
+  "name": "Hähnchenbrust (gebraten)",
+  "kcal": 138,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 V416182 (Hähnchen Brustfilet, gebraten ohne Fett (Pfanne))"
+ },
+ {
+  "name": "Putenbrust (roh)",
+  "kcal": 105,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 V486100 (Pute Brust, ohne Haut, roh)"
+ },
+ {
+  "name": "Rinderhack (roh)",
+  "kcal": 224,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 U010100 (Rind Hackfleisch, roh)"
+ },
+ {
+  "name": "Rindersteak (roh)",
+  "kcal": 110,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 U284100 (Rind Hüfte, roh)"
+ },
+ {
+  "name": "Lachs (roh)",
+  "kcal": 180,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 T410100 (Lachs roh)"
+ },
+ {
+  "name": "Thunfisch (Dose, Wasser)",
+  "kcal": 95,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 T121902 (Thunfisch im eigenen Saft, Konserve, abgetropft)"
+ },
+ {
+  "name": "Seelachs (roh)",
+  "kcal": 99,
+  "unit": "g",
+  "category": "Fleisch & Fisch",
+  "source": "BLS 4.0 T207100 (Köhler/Seelachs, roh)"
+ },
+ {
+  "name": "Ei (Hühnerei)",
+  "kcal": 135,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 E111100 (Hühnerei roh)"
+ },
+ {
+  "name": "Eiklar",
+  "kcal": 42,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 E113100 (Hühnerei Eiklar, roh)"
+ },
+ {
+  "name": "Magerquark",
+  "kcal": 66,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M713100 (Speisequark Magerstufe, Magerquark < 10 % Fett i. Tr.)"
+ },
+ {
+  "name": "Skyr",
+  "kcal": 64,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M710100 (Skyr, Frischkäse < 10 % Fett i. Tr.)"
+ },
+ {
+  "name": "Joghurt 1,5 %",
+  "kcal": 62,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M141200 (Joghurt fettarm, mind. 1,5 % bis max. 1,8 % Fett)"
+ },
+ {
+  "name": "Joghurt 3,5 %",
+  "kcal": 67,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M141300 (Joghurt mild, mind. 3,5 % Fett)"
+ },
+ {
+  "name": "Körniger Frischkäse",
+  "kcal": 109,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M711300 (Körniger Frischkäse mind. 20 % Fett i. Tr.)"
+ },
+ {
+  "name": "Milch 1,5 %",
+  "kcal": 44,
+  "unit": "ml",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M111200 (Milch fettarm, frisch, 1,5 % Fett, pasteurisiert)"
+ },
+ {
+  "name": "Milch 3,5 %",
+  "kcal": 62,
+  "unit": "ml",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M111300 (Vollmilch frisch, 3,5 % Fett, pasteurisiert)"
+ },
+ {
+  "name": "Gouda",
+  "kcal": 313,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M402500 (Gouda mind. 40 % Fett i. Tr.)"
+ },
+ {
+  "name": "Mozzarella",
+  "kcal": 259,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M032100 (Mozzarella mind. 45 % Fett i. Tr.)"
+ },
+ {
+  "name": "Feta",
+  "kcal": 284,
+  "unit": "g",
+  "category": "Eier & Milch",
+  "source": "BLS 4.0 M012200 (Feta mind. 45 % Fett i. Tr.)"
+ },
+ {
+  "name": "Banane",
+  "kcal": 79,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F503100 (Banane roh)"
+ },
+ {
+  "name": "Apfel",
+  "kcal": 58,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F110100 (Apfel roh)"
+ },
+ {
+  "name": "Heidelbeeren",
+  "kcal": 61,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F304100 (Heidelbeere roh)"
+ },
+ {
+  "name": "Erdbeeren",
+  "kcal": 38,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F301100 (Erdbeere roh)"
+ },
+ {
+  "name": "Orange",
+  "kcal": 49,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F603100 (Orange roh)"
+ },
+ {
+  "name": "Weintrauben",
+  "kcal": 61,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F310100 (Weintraube roh)"
+ },
+ {
+  "name": "Avocado",
+  "kcal": 132,
+  "unit": "g",
+  "category": "Obst",
+  "source": "BLS 4.0 F502100 (Avocado roh)"
+ },
+ {
+  "name": "Brokkoli",
+  "kcal": 35,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G312100 (Broccoli roh)"
+ },
+ {
+  "name": "Paprika",
+  "kcal": 36,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G543100 (Gemüsepaprika rot, roh)"
+ },
+ {
+  "name": "Tomate",
+  "kcal": 22,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G561100 (Tomate roh)"
+ },
+ {
+  "name": "Gurke",
+  "kcal": 16,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G520100 (Gurke roh)"
+ },
+ {
+  "name": "Karotte",
+  "kcal": 40,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G620100 (Karotte/Möhre, roh)"
+ },
+ {
+  "name": "Zucchini",
+  "kcal": 22,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G582100 (Zucchini roh)"
+ },
+ {
+  "name": "Spinat",
+  "kcal": 18,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G211100 (Spinat roh)"
+ },
+ {
+  "name": "Kopfsalat",
+  "kcal": 18,
+  "unit": "g",
+  "category": "Gemüse",
+  "source": "BLS 4.0 G105100 (Kopfsalat roh)"
+ },
+ {
+  "name": "Kidneybohnen (Dose)",
+  "kcal": 126,
+  "unit": "g",
+  "category": "Hülsenfrüchte",
+  "source": "BLS 4.0 H742902 (Kidneybohne reif, Konserve, abgetropft)"
+ },
+ {
+  "name": "Kichererbsen (Dose)",
+  "kcal": 136,
+  "unit": "g",
+  "category": "Hülsenfrüchte",
+  "source": "BLS 4.0 H720902 (Kichererbse reif, Konserve, abgetropft)"
+ },
+ {
+  "name": "Linsen (gekocht)",
+  "kcal": 119,
+  "unit": "g",
+  "category": "Hülsenfrüchte",
+  "source": "BLS 4.0 H730132 (Linse reif, gekocht)"
+ },
+ {
+  "name": "Tofu",
+  "kcal": 115,
+  "unit": "g",
+  "category": "Hülsenfrüchte",
+  "source": "BLS 4.0 H861000 (Tofu)"
+ },
+ {
+  "name": "Mandeln",
+  "kcal": 544,
+  "unit": "g",
+  "category": "Nüsse & Samen",
+  "source": "BLS 4.0 H210100 (Mandel süß)"
+ },
+ {
+  "name": "Walnüsse",
+  "kcal": 721,
+  "unit": "g",
+  "category": "Nüsse & Samen",
+  "source": "BLS 4.0 H120100 (Walnuss)"
+ },
+ {
+  "name": "Erdnussmus",
+  "kcal": 620,
+  "unit": "g",
+  "category": "Nüsse & Samen",
+  "source": "BLS 4.0 H110800 (Erdnussmus)"
+ },
+ {
+  "name": "Leinsamen",
+  "kcal": 470,
+  "unit": "g",
+  "category": "Nüsse & Samen",
+  "source": "BLS 4.0 H410100 (Leinsamen)"
+ },
+ {
+  "name": "Olivenöl",
+  "kcal": 899,
+  "unit": "g",
+  "category": "Fette & Öle",
+  "source": "BLS 4.0 Q120000 (Olivenöl)"
+ },
+ {
+  "name": "Rapsöl",
+  "kcal": 900,
+  "unit": "g",
+  "category": "Fette & Öle",
+  "source": "BLS 4.0 Q180000 (Rapsöl/Rüböl)"
+ },
+ {
+  "name": "Butter",
+  "kcal": 747,
+  "unit": "g",
+  "category": "Fette & Öle",
+  "source": "BLS 4.0 Q611000 (Butter mild gesäuert)"
+ },
+ {
+  "name": "Honig",
+  "kcal": 298,
+  "unit": "g",
+  "category": "Süßes",
+  "source": "BLS 4.0 S120000 (Honig)"
+ },
+ {
+  "name": "Zartbitterschokolade",
+  "kcal": 534,
+  "unit": "g",
+  "category": "Süßes",
+  "source": "BLS 4.0 S560000 (Zartbitter-/Halbbitterschokolade)"
+ }
+]

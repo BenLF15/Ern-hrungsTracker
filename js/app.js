@@ -9,6 +9,38 @@ import {
 import { openAdd, openDetail, setContext, sourceBadge, checkBadges, customForm } from "./add.js";
 import { MODELS, hasKey, testKey, reviewDay, initAI, aiMode, aiMissingText } from "./ai.js";
 import { IN_CLAUDE, capability } from "./platform.js";
+import { initThabs, linkInfo, statusFor, thabsEvents, syncDay } from "./thabs.js";
+
+/** Karte zur Thabstracker-Verknüpfung (nur sichtbar, wenn auf derselben Adresse ein Thabstracker läuft). */
+function thabsCardHTML(date) {
+  const link = linkInfo();
+  if (!link?.available) return "";
+  const s = statusFor(date);
+  const at = s?.at ? new Date(s.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
+  const plan = s?.min != null ? `Plan ${s.min === s.max ? fmtKcal(s.min) : `${fmtKcal(s.min)}–${fmtKcal(s.max)}`} kcal` : "";
+  let body;
+  if (!link.user || s?.state === "loggedout") body = `<p class="sub" style="margin:0">Nicht angemeldet. <a href="/">Im Thabstracker anmelden</a>, dann werden deine Kalorien automatisch übertragen.</p>`;
+  else if (link.user.role !== "client") body = `<p class="sub" style="margin:0">Angemeldet als Coach – übertragen wird nur bei Klienten-Zugängen.</p>`;
+  else if (!s) body = `<p class="sub" style="margin:0">Verbunden als ${esc(link.user.displayName)}. Sobald du etwas einträgst, wird der Check-in automatisch ausgefüllt.</p>`;
+  else if (s.state === "noplan") body = `<p class="sub" style="margin:0">Dein Coach hat noch keinen Kalorienplan festgelegt – deshalb wird nichts angekreuzt.</p>`;
+  else if (s.state === "empty") body = `<p class="sub" style="margin:0">Noch nichts eingetragen · ${plan}</p>`;
+  else if (s.state === "ok") body = `<div class="notice ok" style="margin:0"><b>✓ Ja – Kalorien laut Plan eingehalten</b><br>${fmtKcal(s.kcal)} kcal gegessen · ${plan}${s.under ? ` · ${fmtKcal(s.under)} kcal unter dem Bereich` : ""}</div>`;
+  else if (s.state === "over") body = `<div class="notice bad" style="margin:0"><b>✗ Nein – ${fmtKcal(s.over)} kcal über dem Plan</b><br>${fmtKcal(s.kcal)} kcal gegessen (als „Wie viel hast du gegessen?“ eingetragen) · ${plan}</div>`;
+  else body = `<div class="notice warn" style="margin:0">Übertragung fehlgeschlagen – wird automatisch wiederholt. <button class="btn" id="thabsRetry" style="min-height:32px;padding:4px 10px">Jetzt erneut</button></div>`;
+  return `<section class="card" aria-label="Thabstracker">
+    <div class="card-head"><h3>🔗 Thabstracker</h3><span class="muted">${at && s?.state !== "error" ? "übertragen " + at : ""}</span></div>
+    ${body}
+    <p class="muted" style="margin:8px 0 0"><a href="/">Zum Thabstracker</a></p>
+  </section>`;
+}
+function refreshThabsCard() {
+  const el = document.getElementById("thabsCard");
+  if (!el) return;
+  el.innerHTML = thabsCardHTML(key());
+  const r = document.getElementById("thabsRetry");
+  if (r) r.addEventListener("click", () => syncDay(key()));
+}
+thabsEvents.addEventListener("change", refreshThabsCard);
 
 /** Zweistufige Bestätigung im Button selbst (confirm() ist im Chat gesperrt). */
 function armConfirm(btn, label, action) {
@@ -121,6 +153,8 @@ function renderToday() {
         <div><b class="num">${fmt(tot.salt, 1)} g</b><span class="muted">Salz</span></div>
       </div>
     </section>
+
+    <div id="thabsCard">${thabsCardHTML(key())}</div>
 
     <section class="card" aria-label="Wasser">
       <div class="card-head"><h3>💧 Wasser</h3><span class="sub num">Ziel ${fmt(g.water / 1000, 2)} l</span></div>
@@ -472,6 +506,7 @@ function renderSettings() {
 // ------------------------------------------------------------------ Start
 applyTheme();
 render();
+initThabs();
 loadDB().catch((e) => toast(e.message, 5000));
 if (IN_CLAUDE) {
   // Im Chat: KI über das Claude-Konto und dauerhafter Speicher – danach neu zeichnen

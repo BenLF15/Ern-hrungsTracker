@@ -85,6 +85,14 @@ Render stellt HTTPS bereit – damit funktionieren Kamera, Barcode-Scan und die 
 („Zum Startbildschirm hinzufügen“). Nach jedem Push baut Render neu; installierte Apps laden die neue
 Version beim nächsten Öffnen.
 
+## Thabstracker-Testkopie mit Kalorien-Verknüpfung
+
+Im Ordner [`thabs/`](thabs/README.md) liegt eine getrennte Kopie des Thabstrackers mit nachgebautem Server.
+Beide Apps laufen dort unter einer Adresse (Kopie unter `/`, Ernährungstracker unter `/ernaehrung/`);
+nach jedem Speichern im Ernährungstracker wird im Check-in automatisch „Kalorien laut Plan eingehalten?“
+angekreuzt (Ja/Nein, bei Nein mit den gegessenen kcal). Lokal: `npm run dev:thabs`; auf Render: Dienst
+`thabs-kopie` aus `render.yaml`.
+
 ## Version im Claude-Chat
 
 `tools/build-artifact.mjs` baut eine einzelne HTML-Datei (Code, Styles und Datenbank eingebettet), die als
@@ -113,6 +121,7 @@ js/camera.js                 Kamera, Barcode-Scanner, Bildverkleinerung
 js/portions.js               Typische Portionsgrößen (Richtwerte)
 js/store.js                  Speicherung (localStorage bzw. Artifact-Speicher), Export/Import
 js/platform.js               Erkennung Web-App vs. Claude-Chat
+js/thabs.js                  Verknüpfung mit der Thabstracker-Kopie (gleiche Adresse)
 data/foods.json              Generierte Lebensmitteldatenbank
 vendor/                      Gebündelt: Anthropic TypeScript SDK (MIT), ZXing (Apache 2.0)
 tools/build_db.py            Erzeugt data/foods.json
@@ -121,6 +130,7 @@ tools/build.mjs              Build nach dist/ (npm run build)
 tools/serve.mjs              Statischer Server (npm start / npm run dev)
 tools/build-vendor.mjs       Bündelt vendor/ neu
 package.json, render.yaml    Build-Skripte und Render-Konfiguration
+thabs/                       Thabstracker-Testkopie (Oberfläche + nachgebauter Server)
 ```
 
 ## Lizenzen

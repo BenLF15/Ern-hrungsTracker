@@ -129,9 +129,12 @@ export function getDay(key) {
   const d = read("day." + key, null);
   return d ? { entries: d.entries || [], water: d.water || 0 } : { entries: [], water: 0 };
 }
+/** Meldet jede Änderung eines Tages (detail = Datum), z. B. für die Thabstracker-Verknüpfung. */
+export const dayEvents = new EventTarget();
 export function saveDay(key, day) {
-  if (!day.entries.length && !day.water) { del("day." + key); return; }
-  write("day." + key, day);
+  if (!day.entries.length && !day.water) del("day." + key);
+  else write("day." + key, day);
+  dayEvents.dispatchEvent(new CustomEvent("change", { detail: key }));
 }
 export function addEntry(key, entry) {
   const day = getDay(key);

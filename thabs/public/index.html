@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thabstracker</title>
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1b1b1b" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-title" content="Thabstracker">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar" id="topbar" hidden>
+    <a class="brand" href="#/">
+      <img src="/logo.jpg" alt="" width="60" height="40">
+      <span>Thabstracker</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Hauptnavigation"></nav>
+    <div class="topbar-user">
+      <span id="whoami"></span>
+      <button class="btn-ghost" id="btn-password" type="button">Passwort</button>
+      <button class="btn-ghost" id="btn-logout" type="button">Abmelden</button>
+    </div>
+  </header>
+  <main id="app" class="container"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="dialog"></dialog>
+  <script src="/charts.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

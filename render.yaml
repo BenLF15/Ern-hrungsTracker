@@ -30,3 +30,26 @@ services:
       - path: /manifest.webmanifest
         name: Cache-Control
         value: no-cache
+
+  # Thabstracker-KOPIE + Ernährungstracker unter einer Adresse (Verknüpfung Variante A).
+  # Getrennt vom echten Thabstracker: eigener Dienst, eigene Daten, eigene Zugänge.
+  #   /              Thabstracker-Kopie   (Coach-Login: Benutzername "coach", Passwort = COACH_PASSWORD)
+  #   /ernaehrung/   Ernährungstracker    (überträgt die Kalorien automatisch in den Check-in)
+  - type: web
+    runtime: node
+    name: thabs-kopie
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start:thabs
+    healthCheckPath: /healthz
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: COACH_PASSWORD
+        generateValue: true   # im Render-Dashboard unter "Environment" einsehbar
+    # Ohne Persistent Disk gehen die Daten bei jedem Neustart/Deploy verloren (Free-Plan).
+    # Für dauerhafte Daten: Plan "starter" wählen, diese Disk aktivieren und DATA_DIR setzen:
+    # disk:
+    #   name: thabs-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # (envVars ergänzen:  - key: DATA_DIR   value: /var/data)

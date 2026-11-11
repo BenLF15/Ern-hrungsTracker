@@ -13,7 +13,9 @@
     "dev": "node tools/serve.mjs --root .",
     "build:chat": "node tools/build-artifact.mjs dist-chat/naehrwert-chat.html",
     "build:vendor": "node tools/build-vendor.mjs",
-    "check": "node tools/build.mjs --check"
+    "check": "node tools/build.mjs --check",
+    "start:thabs": "node thabs/server/index.js",
+    "dev:thabs": "node tools/build.mjs && node thabs/server/index.js"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "1.8.0",
