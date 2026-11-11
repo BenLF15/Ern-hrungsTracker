@@ -65,6 +65,20 @@ python3 -m http.server 8000   # dann http://localhost:8000
 Für das Handy z. B. über **GitHub Pages** veröffentlichen (Settings → Pages → Branch wählen) und die
 Seite über „Zum Startbildschirm hinzufügen“ als App installieren.
 
+## Version im Claude-Chat
+
+`tools/build-artifact.mjs` baut eine einzelne HTML-Datei (Code, Styles und Datenbank eingebettet), die als
+Artifact im Claude-Chat läuft. Dort gilt:
+
+* **KI über das Claude-Konto** (kein API-Schlüssel nötig), inkl. Fotoanalyse; beim ersten Einsatz fragt Claude um Erlaubnis.
+* **Einträge dauerhaft und privat** im Speicher des Artifacts (nur für die angemeldete Person sichtbar).
+* **Gesperrt** sind dort Live-Kamera und externe Server: Barcode-Produktabfrage (Open Food Facts) funktioniert
+  nur in der Web-App. Ersatz: Foto hochladen bzw. Kamera-App, Nährwerttabelle fotografieren.
+
+```sh
+node tools/build-artifact.mjs dist/naehrwert-chat.html   # benötigt esbuild
+```
+
 ## Aufbau
 
 ```
@@ -77,10 +91,12 @@ js/ai.js                     Claude: Fotoanalyse, DB-Zuordnung, Nährwert- und T
 js/off.js                    Open Food Facts (Barcode, Online-Suche, GTIN-Prüfziffer)
 js/camera.js                 Kamera, Barcode-Scanner, Bildverkleinerung
 js/portions.js               Typische Portionsgrößen (Richtwerte)
-js/store.js                  Lokale Speicherung, Export/Import
+js/store.js                  Speicherung (localStorage bzw. Artifact-Speicher), Export/Import
+js/platform.js               Erkennung Web-App vs. Claude-Chat
 data/foods.json              Generierte Lebensmitteldatenbank
 vendor/                      Gebündelt: Anthropic TypeScript SDK (MIT), ZXing (Apache 2.0)
 tools/build_db.py            Erzeugt data/foods.json
+tools/build-artifact.mjs     Erzeugt die Einzeldatei-Version für den Chat
 ```
 
 ## Lizenzen

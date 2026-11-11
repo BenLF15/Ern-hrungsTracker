@@ -1,9 +1,11 @@
-// KI-Funktionen über die Claude API (Anthropic). Der API-Schlüssel wird vom Nutzer
-// in den Einstellungen hinterlegt und nur lokal gespeichert; Anfragen gehen direkt
-// vom Browser an api.anthropic.com.
-import { Anthropic } from "../vendor/anthropic-sdk.mjs";
+// KI-Funktionen. Zwei Wege:
+// 1. Im Claude-Chat (Artifact): über das Claude-Konto der Person (capability "sample"),
+//    kein API-Schlüssel nötig.
+// 2. Als normale Website: Claude API mit eigenem Schlüssel (nur lokal gespeichert,
+//    Anfragen gehen direkt vom Browser an api.anthropic.com).
 import { getSettings, cacheGet, cacheSet } from "./store.js";
 import { energyFromMacros } from "./nutrition.js";
+import { capability, IN_CLAUDE } from "./platform.js";
 
 export const MODELS = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5 (genaueste Ergebnisse, Standard)" },
@@ -11,12 +13,37 @@ export const MODELS = [
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5 (am schnellsten, am günstigsten)" },
 ];
 
-export function hasKey() { return !!getSettings().ai.apiKey; }
+let sampleFn = null;
+let sampleImages = false;
+let sampleDenied = false;
+/** Im Chat: Claude-Zugang über das Konto ermitteln. */
+export async function initAI() {
+  sampleFn = await capability("sample");
+  if (sampleFn) {
+    try { sampleImages = !!(await sampleFn.limits())?.images; } catch { sampleImages = false; }
+  }
+  return !!sampleFn;
+}
+/** "claude" (Konto im Chat), "api" (eigener Schlüssel) oder null. */
+export function aiMode() {
+  if (sampleFn && !sampleDenied) return "claude";
+  return getSettings().ai.apiKey ? "api" : null;
+}
+export function hasKey() { return !!aiMode(); }
+export function canSendImages() { return aiMode() === "claude" ? sampleImages : aiMode() === "api"; }
+export function aiMissingText() {
+  if (IN_CLAUDE) return sampleDenied ? "Die KI wurde für diese Seite nicht erlaubt. Lade die Seite neu, um erneut gefragt zu werden." : "KI ist in dieser Ansicht nicht verfügbar.";
+  return "Für KI-Funktionen wird ein Claude-API-Schlüssel benötigt (Einstellungen → KI).";
+}
+
+let sdk = null;
+async function loadSDK() { return (sdk ||= (await import("../vendor/anthropic-sdk.mjs")).Anthropic); }
 
 let client = null, clientKey = null;
-function getClient() {
+async function getClient() {
   const key = getSettings().ai.apiKey;
-  if (!key) throw new Error("Kein Claude-API-Schlüssel hinterlegt. Bitte in den Einstellungen eintragen.");
+  if (!key) throw new Error(aiMissingText());
+  const Anthropic = await loadSDK();
   if (!client || clientKey !== key) {
     client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: 2, timeout: 180000 });
     clientKey = key;
@@ -25,27 +52,74 @@ function getClient() {
 }
 
 function friendlyError(e) {
-  if (e instanceof Anthropic.AuthenticationError) return new Error("Der Claude-API-Schlüssel ist ungültig.");
-  if (e instanceof Anthropic.PermissionDeniedError) return new Error("Der API-Schlüssel hat keine Berechtigung für dieses Modell.");
-  if (e instanceof Anthropic.RateLimitError) return new Error("Claude API: Ratenlimit erreicht – bitte gleich noch einmal versuchen.");
-  if (e instanceof Anthropic.BadRequestError) return new Error("Claude API hat die Anfrage abgelehnt: " + (e.error?.error?.message || e.message));
-  if (e instanceof Anthropic.InternalServerError) return new Error("Claude API ist gerade überlastet – bitte erneut versuchen.");
-  if (e instanceof Anthropic.APIConnectionTimeoutError) return new Error("Zeitüberschreitung bei der Claude API.");
-  if (e instanceof Anthropic.APIConnectionError) return new Error("Keine Verbindung zur Claude API (offline?).");
+  const A = sdk;
+  if (A) {
+    if (e instanceof A.AuthenticationError) return new Error("Der Claude-API-Schlüssel ist ungültig.");
+    if (e instanceof A.PermissionDeniedError) return new Error("Der API-Schlüssel hat keine Berechtigung für dieses Modell.");
+    if (e instanceof A.RateLimitError) return new Error("Claude API: Ratenlimit erreicht – bitte gleich noch einmal versuchen.");
+    if (e instanceof A.BadRequestError) return new Error("Claude API hat die Anfrage abgelehnt: " + (e.error?.error?.message || e.message));
+    if (e instanceof A.InternalServerError) return new Error("Claude API ist gerade überlastet – bitte erneut versuchen.");
+    if (e instanceof A.APIConnectionTimeoutError) return new Error("Zeitüberschreitung bei der Claude API.");
+    if (e instanceof A.APIConnectionError) return new Error("Keine Verbindung zur Claude API (offline?).");
+  }
   return e instanceof Error ? e : new Error(String(e));
 }
 
+const SAMPLE_ERRORS = {
+  not_granted: "Die KI wurde für diese Seite nicht erlaubt.",
+  sampling_disabled: "Claude ist für dieses Konto nicht verfügbar.",
+  rate_limited: "Zu viele KI-Anfragen oder Nutzungslimit erreicht – bitte später erneut versuchen.",
+  session_expired: "Bitte erneut bei Claude anmelden.",
+  image_rejected: "Das Bild konnte nicht verarbeitet werden. Bitte ein anderes Foto (JPEG/PNG) wählen.",
+  images_unavailable: "In dieser Ansicht können keine Bilder an Claude gesendet werden.",
+  refused: "Claude hat diese Anfrage abgelehnt.",
+  invalid_json: "Die KI-Antwort war unvollständig. Bitte erneut versuchen.",
+  empty_completion: "Die KI hat keine Antwort geliefert. Bitte erneut versuchen.",
+  prompt_too_large: "Die Anfrage ist zu groß.",
+  upstream_error: "Claude ist gerade nicht erreichbar. Bitte erneut versuchen.",
+};
+
 const nullable = (t) => ({ anyOf: [{ type: t }, { type: "null" }] });
 
+/** Prüft, ob die Antwort die nötigen Felder hat (Antworten über das Konto sind nicht schemagebunden). */
+function need(obj, keys) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj) || keys.some((k) => !(k in obj))) {
+    throw new Error("Die KI-Antwort hatte ein unerwartetes Format. Bitte erneut versuchen.");
+  }
+  return obj;
+}
+
 /**
- * Eine Anfrage mit garantiert gültigem JSON-Ergebnis (Structured Outputs).
- * Bei Opus/Sonnet ist die serverseitige Refusal-Fallback-Funktion aktiv.
+ * Eine Anfrage mit JSON-Ergebnis.
+ * text: Aufgabe + Daten; image: {base64, mediaType, blob} optional.
+ * tier: "default" | "complex" (nur im Chat relevant), effort: für die API.
  */
-async function structured({ system, content, schema, effort = "medium", maxTokens = 16000 }) {
-  const c = getClient();
+async function structured({ system, text, image = null, schema, effort = "medium", tier = "default" }) {
+  const mode = aiMode();
+  if (!mode) throw new Error(aiMissingText());
+
+  if (mode === "claude") {
+    const prompt = `${system}\n\n${text}\n\nAntworte ausschließlich mit EINEM JSON-Objekt, das genau diesem JSON-Schema entspricht (alle Pflichtfelder, keine zusätzlichen Felder, Zahlen als Zahlen, fehlende Werte als null):\n${JSON.stringify(schema)}`;
+    const opts = { modelTier: tier };
+    if (image) opts.images = [image.blob];
+    try {
+      return need(await sampleFn.json(prompt, opts), schema.required || []);
+    } catch (e) {
+      if (e && typeof e === "object" && "code" in e) {
+        if (e.code === "not_granted" || e.code === "sampling_disabled") sampleDenied = true;
+        throw new Error(SAMPLE_ERRORS[e.code] || SAMPLE_ERRORS.upstream_error);
+      }
+      throw e;
+    }
+  }
+
+  const c = await getClient();
   const model = getSettings().ai.model || "claude-opus-5-5";
+  const content = [];
+  if (image) content.push({ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } });
+  content.push({ type: "text", text });
   const base = {
-    model, max_tokens: maxTokens, system,
+    model, max_tokens: 16000, system,
     messages: [{ role: "user", content }],
     output_config: { effort, format: { type: "json_schema", schema } },
   };
@@ -58,7 +132,7 @@ async function structured({ system, content, schema, effort = "medium", maxToken
         res = await c.beta.messages.create({ ...base, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
       } catch (e) {
         // Falls das Konto/Modell die Fallback-Beta nicht unterstützt: ohne erneut versuchen.
-        if (e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message)) res = await c.messages.create(base);
+        if (e instanceof sdk.BadRequestError && /fallback/i.test(e.message)) res = await c.messages.create(base);
         else throw e;
       }
     }
@@ -66,8 +140,8 @@ async function structured({ system, content, schema, effort = "medium", maxToken
 
   if (res.stop_reason === "refusal") throw new Error("Die KI hat diese Anfrage abgelehnt." + (res.stop_details?.explanation ? " " + res.stop_details.explanation : ""));
   if (res.stop_reason === "max_tokens") throw new Error("Die KI-Antwort war zu lang und wurde abgeschnitten. Bitte erneut versuchen.");
-  const text = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-  try { return JSON.parse(text); }
+  const out = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+  try { return JSON.parse(out); }
   catch { throw new Error("Die KI-Antwort konnte nicht gelesen werden."); }
 }
 
@@ -121,17 +195,29 @@ Regeln:
 - Keine Nährwerte für Mahlzeiten schätzen – die kommen aus der offiziellen Datenbank. Nur erkennen und Mengen schätzen.
 - "comment": 1–2 Sätze auf Deutsch zu Unsicherheiten.`;
 
-/** Analysiert ein Foto (Base64-JPEG ohne Präfix). */
-export async function analyzeImage(base64, mediaType, hint = "") {
-  return structured({
+/** Analysiert ein Foto. image = {base64, mediaType, blob} aus prepareImage(). */
+export async function analyzeImage(image, hint = "") {
+  const r = await structured({
     system: IMAGE_SYSTEM,
     effort: "high",
+    tier: "complex",
     schema: IMAGE_SCHEMA,
-    content: [
-      { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-      { type: "text", text: "Analysiere dieses Foto." + (hint ? ` Zusatzinfo vom Nutzer: ${hint}` : "") },
-    ],
+    image,
+    text: "Analysiere das beigefügte Foto." + (hint ? ` Zusatzinfo vom Nutzer: ${hint}` : ""),
   });
+  if (!Array.isArray(r.items)) r.items = [];
+  r.items = r.items.filter((it) => it && typeof it.name === "string").map((it) => ({
+    ...it,
+    search_terms: Array.isArray(it.search_terms) ? it.search_terms.map(String) : [it.name],
+    preparation: it.preparation || "",
+    grams: Number(it.grams) || 100,
+    grams_min: Number(it.grams_min) || Number(it.grams) || 0,
+    grams_max: Number(it.grams_max) || Number(it.grams) || 0,
+    confidence: ["hoch", "mittel", "niedrig"].includes(it.confidence) ? it.confidence : "mittel",
+    basis: it.basis || "",
+  }));
+  r.comment = r.comment || "";
+  return r;
 }
 
 // ------------------------------------------------------------------ Zuordnung zur Datenbank
@@ -168,7 +254,7 @@ Wähle je Komponente genau den Kandidaten, der Lebensmittel UND Zubereitungsart 
 Passe "grams" nur an, wenn der gewählte Eintrag einen anderen Zustand beschreibt als geschätzt (z. B. Trockengewicht vs. gekocht), sonst übernimm die Schätzung. "reason": kurz auf Deutsch.`,
     effort: "medium",
     schema: MATCH_SCHEMA,
-    content: [{ type: "text", text: lines }],
+    text: lines,
   });
 }
 
@@ -219,10 +305,12 @@ Berücksichtige: EU-Angaben nennen verwertbare Kohlenhydrate ohne Ballaststoffe;
 Nenne in "issues" nur echte Abweichungen mit erwartetem Bereich. "summary": 1–2 Sätze auf Deutsch.`,
     effort: "medium",
     schema: VERIFY_SCHEMA,
-    content: [{ type: "text", text }],
+    text,
   });
+  if (!["plausibel", "auffaellig", "unplausibel"].includes(result.verdict)) throw new Error("Die KI-Antwort hatte ein unerwartetes Format. Bitte erneut versuchen.");
+  if (!Array.isArray(result.issues)) result.issues = [];
   result.checkedAt = new Date().toISOString();
-  result.model = getSettings().ai.model;
+  result.model = aiMode() === "claude" ? "Claude (Konto)" : getSettings().ai.model;
   cacheSet("verify", id, result);
   return result;
 }
@@ -248,13 +336,14 @@ export async function reviewDay(entries, totals, goals) {
     system: `Du prüfst ein Ernährungstagebuch auf Eingabefehler (unrealistische Mengen, vertauschte Einheiten, doppelte Einträge, falsche Lebensmittelzuordnung, z. B. roh statt gekocht). Gib keine Ernährungsberatung und keine medizinischen Ratschläge, nur Hinweise zur Datenqualität. Antworte knapp auf Deutsch.`,
     effort: "medium",
     schema: DAY_SCHEMA,
-    content: [{ type: "text", text: `Einträge:\n${list || "(keine)"}\n\nSumme: ${Math.round(totals.kcal)} kcal, Eiweiß ${totals.protein.toFixed(1)} g, KH ${totals.carb.toFixed(1)} g, Fett ${totals.fat.toFixed(1)} g. Ziel: ${goals.kcal} kcal.` }],
-  });
+    text: `Einträge:\n${list || "(keine)"}\n\nSumme: ${Math.round(totals.kcal)} kcal, Eiweiß ${totals.protein.toFixed(1)} g, KH ${totals.carb.toFixed(1)} g, Fett ${totals.fat.toFixed(1)} g. Ziel: ${goals.kcal} kcal.`,
+  }).then((r) => ({ summary: String(r.summary || ""), findings: Array.isArray(r.findings) ? r.findings : [] }));
 }
 
 /** Testet den Schlüssel mit einer minimalen Anfrage. */
 export async function testKey() {
-  const c = getClient();
+  if (aiMode() === "claude") { await structured({ system: "Verbindungstest.", text: "Gib {\"ok\": true} zurück.", schema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }, tier: "quick" }); return true; }
+  const c = await getClient();
   try {
     const r = await c.messages.create({ model: getSettings().ai.model, max_tokens: 64, output_config: { effort: "low" }, messages: [{ role: "user", content: "Antworte nur mit: OK" }] });
     return r.content.some((b) => b.type === "text");

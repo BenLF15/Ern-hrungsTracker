@@ -9,10 +9,13 @@ let index = null; // [{row, tokens:[...], compact, group}]
 export async function loadDB() {
   if (DB) return DB;
   if (!loading) {
-    loading = fetch("data/foods.json").then((r) => {
+    // Eingebettete Daten (Einzeldatei-Version) oder data/foods.json laden
+    const inline = document.getElementById("foods-data");
+    const src = inline ? Promise.resolve(JSON.parse(inline.textContent)) : fetch("data/foods.json").then((r) => {
       if (!r.ok) throw new Error("Datenbank konnte nicht geladen werden (" + r.status + ")");
       return r.json();
-    }).then((d) => {
+    });
+    loading = src.then((d) => {
       DB = d;
       DB.byCode = new Map(d.foods.map((r) => [r[0], r]));
       DB.incomplete = new Set(d.incompleteEnergy);

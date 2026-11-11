@@ -4,10 +4,22 @@ import { loadDB, search } from "./db.js";
 import { scale, sum, fmt, fmtKcal, estimateNeeds } from "./nutrition.js";
 import {
   MEALS, GLASS_ML, getSettings, saveSettings, dayKey, parseDayKey, getDay, changeWater, allDayKeys,
-  getCustomFoods, deleteCustomFood, exportAll, importAll, wipeAll,
+  getCustomFoods, deleteCustomFood, exportAll, importAll, wipeAll, initStore, storageMode, lastSyncError,
 } from "./store.js";
 import { openAdd, openDetail, setContext, sourceBadge, checkBadges, customForm } from "./add.js";
-import { MODELS, hasKey, testKey, reviewDay } from "./ai.js";
+import { MODELS, hasKey, testKey, reviewDay, initAI, aiMode, aiMissingText } from "./ai.js";
+import { IN_CLAUDE, capability } from "./platform.js";
+
+/** Zweistufige Bestätigung im Button selbst (confirm() ist im Chat gesperrt). */
+function armConfirm(btn, label, action) {
+  let armed = false, t = null;
+  const orig = btn.innerHTML;
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!armed) { armed = true; btn.textContent = label; btn.classList.add("danger"); t = setTimeout(() => { armed = false; btn.innerHTML = orig; }, 4000); return; }
+    clearTimeout(t); action();
+  });
+}
 
 const state = { date: new Date(), tab: "today", statsRange: 7 };
 const view = $("#view");
@@ -140,7 +152,7 @@ function renderToday() {
     ${day.entries.length ? `<section class="card"><div class="card-head"><h3>Tagesprüfung</h3></div>
       <p class="sub" style="margin-top:0">Die KI prüft deine Einträge auf typische Eingabefehler (unrealistische Mengen, roh/gekocht verwechselt, doppelte Einträge).</p>
       <button class="btn block" id="dayReview" ${hasKey() ? "" : "disabled"}>🤖 Tag von KI prüfen lassen</button>
-      ${hasKey() ? "" : `<p class="muted">Benötigt einen Claude-API-Schlüssel (Einstellungen).</p>`}
+      ${hasKey() ? "" : `<p class="muted">${esc(aiMissingText())}</p>`}
       <div id="dayReviewRes"></div></section>` : ""}
   `;
 
@@ -263,7 +275,7 @@ function renderFoods() {
     </section>
     <section class="card">
       <div class="card-head"><h3>Eigene Lebensmittel</h3><button class="btn" id="newCustom">+ Neu</button></div>
-      ${custom.length ? `<ul class="results" id="clist">${custom.map((f, i) => `<li data-i="${i}"><div class="r-main"><div class="r-name">${esc(f.name)}</div><div class="sub">${f.brand ? esc(f.brand) + " · " : ""}${fmtKcal(f.per100.kcal)} kcal/100 ${esc(f.unit || "g")}</div><div class="badges">${sourceBadge(f)}${checkBadges(f)}</div></div><button class="icon-btn" data-del="${i}" aria-label="Löschen">🗑</button></li>`).join("")}</ul>` : `<p class="sub">Noch keine eigenen Lebensmittel. Lege Produkte an, die du nicht in der Datenbank findest – oder fotografiere die Nährwerttabelle.</p>`}
+      ${custom.length ? `<ul class="results" id="clist">${custom.map((f, i) => `<li data-i="${i}"><div class="r-main"><div class="r-name">${esc(f.name)}</div><div class="sub">${f.brand ? esc(f.brand) + " · " : ""}${fmtKcal(f.per100.kcal)} kcal/100 ${esc(f.unit || "g")}</div><div class="badges">${sourceBadge(f)}${checkBadges(f)}</div></div><button class="btn" data-del="${i}" aria-label="${esc(f.name)} löschen">Löschen</button></li>`).join("")}</ul>` : `<p class="sub">Noch keine eigenen Lebensmittel. Lege Produkte an, die du nicht in der Datenbank findest – oder fotografiere die Nährwerttabelle.</p>`}
     </section>
     <section class="card" id="dbInfo">${loadingHTML("Lade Datenbank …")}</section>`;
 
@@ -298,13 +310,12 @@ function renderFoods() {
 
   $("#newCustom").addEventListener("click", () => openSheet("Eigenes Lebensmittel", (b) => customForm(b, null, { onSaved: () => { closeSheet(); toast("Gespeichert"); renderFoods(); } })));
   const cl = $("#clist");
+  if (cl) $$("[data-del]", cl).forEach((btn) => {
+    const f = custom[+btn.dataset.del];
+    armConfirm(btn, "Wirklich?", () => { deleteCustomFood(f.source.ref); toast("Gelöscht"); renderFoods(); });
+  });
   if (cl) cl.addEventListener("click", (e) => {
-    const del = e.target.closest("[data-del]");
-    if (del) {
-      const f = custom[+del.dataset.del];
-      if (confirm(`„${f.name}“ löschen?`)) { deleteCustomFood(f.source.ref); renderFoods(); }
-      return;
-    }
+    if (e.target.closest("[data-del]")) return;
     const li = e.target.closest("li");
     if (li) {
       const f = custom[+li.dataset.i];
@@ -353,9 +364,11 @@ function renderSettings() {
 
     <section class="card">
       <h3>KI (Claude)</h3>
+      ${IN_CLAUDE ? `<p class="sub" style="margin-top:0">${aiMode() === "claude" ? "✓ Die KI läuft hier über dein Claude-Konto – kein API-Schlüssel nötig. Beim ersten Einsatz fragt Claude einmal um Erlaubnis." : esc(aiMissingText())}</p>
+      <input type="hidden" id="aiKey" value="${esc(s.ai.apiKey)}"><input type="hidden" id="aiModel" value="${esc(s.ai.model)}">` : `
       <p class="sub" style="margin-top:0">Für Fotoerkennung und KI-Prüfung der Nährwerte. Der Schlüssel wird nur in diesem Browser gespeichert und direkt an api.anthropic.com gesendet. Einen Schlüssel erhältst du unter <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a>.</p>
       <label class="field">API-Schlüssel<input type="password" id="aiKey" value="${esc(s.ai.apiKey)}" placeholder="sk-ant-…" autocomplete="off"></label>
-      <label class="field">Modell<select id="aiModel">${MODELS.map((m) => `<option value="${m.id}" ${m.id === s.ai.model ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>
+      <label class="field">Modell<select id="aiModel">${MODELS.map((m) => `<option value="${m.id}" ${m.id === s.ai.model ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>`}
       <label class="field">Automatische KI-Prüfung der Nährwerte
         <select id="aiVerify">
           <option value="all" ${s.ai.verify === "all" ? "selected" : ""}>Für alle Lebensmittel (einmal je Lebensmittel, wird gespeichert)</option>
@@ -373,7 +386,8 @@ function renderSettings() {
 
     <section class="card">
       <h3>Daten</h3>
-      <p class="sub" style="margin-top:0">Alle Einträge liegen ausschließlich lokal in diesem Browser (${allDayKeys().length} ${allDayKeys().length === 1 ? "Tag" : "Tage"} gespeichert). Sichere sie regelmäßig.</p>
+      <p class="sub" style="margin-top:0">${storageMode() === "cloud" ? "Deine Einträge werden privat im Speicher dieser Seite gesichert (nur du siehst sie)" : "Alle Einträge liegen ausschließlich lokal in diesem Browser"} – ${allDayKeys().length} ${allDayKeys().length === 1 ? "Tag" : "Tage"} gespeichert.${storageMode() === "cloud" ? "" : " Sichere sie regelmäßig."}</p>
+      ${lastSyncError() ? `<div class="notice warn">${esc(lastSyncError())}</div>` : ""}
       <div class="btn-row">
         <button class="btn" id="exp">Exportieren (JSON)</button>
         <label class="btn">Importieren<input type="file" id="imp" accept="application/json,.json" hidden></label>
@@ -432,11 +446,20 @@ function renderSettings() {
   });
   $("#theme").addEventListener("change", (e) => { const ns = getSettings(); ns.theme = e.target.value; saveSettings(ns); applyTheme(); });
 
-  $("#exp").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(exportAll(), null, 1)], { type: "application/json" });
+  $("#exp").addEventListener("click", async () => {
+    const json = JSON.stringify(exportAll(), null, 1);
+    const filename = `naehrwert-sicherung-${dayKey(new Date())}.json`;
+    if (IN_CLAUDE) {
+      const dl = await capability("downloads");
+      if (!dl) { toast("Export ist in dieser Ansicht nicht verfügbar."); return; }
+      try { await dl.save({ filename, data: json }); toast("Sicherung gespeichert"); }
+      catch (e) { if (e?.code !== "declined") toast("Export nicht möglich (" + (e?.code || "Fehler") + ")"); }
+      return;
+    }
+    const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `naehrwert-sicherung-${dayKey(new Date())}.json`;
+    a.download = filename;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
@@ -445,16 +468,20 @@ function renderSettings() {
     try { importAll(JSON.parse(await f.text())); toast("Import erfolgreich"); applyTheme(); renderSettings(); }
     catch (err) { toast(err.message); }
   });
-  $("#wipe").addEventListener("click", () => {
-    if (confirm("Wirklich ALLE Einträge, eigenen Lebensmittel und Einstellungen löschen?")) { wipeAll(); toast("Alle Daten gelöscht"); applyTheme(); renderSettings(); }
-  });
+  armConfirm($("#wipe"), "Wirklich ALLES löschen? Nochmal tippen", () => { wipeAll(); toast("Alle Daten gelöscht"); applyTheme(); renderSettings(); });
 }
 
 // ------------------------------------------------------------------ Start
 applyTheme();
 render();
 loadDB().catch((e) => toast(e.message, 5000));
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+if (IN_CLAUDE) {
+  // Im Chat: KI über das Claude-Konto und dauerhafter Speicher – danach neu zeichnen
+  const sheetClosed = () => !document.querySelector("#sheet:not([hidden])");
+  initAI().then(() => { if (sheetClosed()) render(); });
+  initStore().then((ok) => { if (ok) { applyTheme(); if (sheetClosed()) render(); } });
+}
+if (!IN_CLAUDE && "serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 // Tageswechsel um Mitternacht berücksichtigen, wenn die App offen bleibt

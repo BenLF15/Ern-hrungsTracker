@@ -4,7 +4,8 @@ import { loadDB, search, candidates, foodByCode, groupList, db } from "./db.js";
 import { NUTRIENTS, scale, validate, fmt, fmtKcal, energyFromMacros } from "./nutrition.js";
 import { MEALS, addEntry, updateEntry, removeEntry, getRecent, getFavs, isFav, toggleFav, saveCustomFood, getSettings } from "./store.js";
 import { lookupBarcode, searchProducts, validGtin } from "./off.js";
-import { hasKey, analyzeImage, matchToDatabase, verifyFood, cachedVerification } from "./ai.js";
+import { hasKey, analyzeImage, matchToDatabase, verifyFood, cachedVerification, aiMissingText, canSendImages } from "./ai.js";
+import { IN_CLAUDE } from "./platform.js";
 import { startStream, stopStream, scanBarcodes, grabFrame, prepareImage, decodeImageBarcode, cameraSupported } from "./camera.js";
 
 let ctx = { dayKey: null, meal: "breakfast", onChange: () => {} };
@@ -140,7 +141,7 @@ function paneSearch(p) {
     if (!term && !group) return showStart();
     const list = term ? search(term, { group, limit: 80 }) : db().foods.filter((r) => r[0][0] === group || (group === "X" && r[0][0] === "Y")).slice(0, 200).map((r) => foodByCode(r[0]));
     res.innerHTML = (list.length ? `<ul class="results" id="rl">${list.map(resultItem).join("")}</ul>` : `<div class="empty">Kein Treffer in der amtlichen Datenbank.</div>`) +
-      (term ? `<button class="btn block" id="offBtn" style="margin-top:12px">🔎 „${esc(term)}“ in Open Food Facts suchen (Markenprodukte)</button><div id="offRes"></div>` : "");
+      (term && !IN_CLAUDE ? `<button class="btn block" id="offBtn" style="margin-top:12px">🔎 „${esc(term)}“ in Open Food Facts suchen (Markenprodukte)</button><div id="offRes"></div>` : "");
     if (list.length) bindResults($("#rl", res), list, (f) => openDetail(f));
     const ob = $("#offBtn", res);
     if (ob) ob.addEventListener("click", async () => {
@@ -177,7 +178,7 @@ function paneBarcode(p) {
       <div style="display:flex;gap:8px"><input type="text" inputmode="numeric" id="ean" placeholder="z. B. 4000417025005" maxlength="14"><button class="btn primary" id="eanGo">Suchen</button></div>
     </label>
     <div id="bcRes"></div>
-    <p class="muted">Produktdaten stammen aus Open Food Facts (Herstellerangaben vom Etikett, ODbL). Sie werden automatisch auf Plausibilität geprüft${hasKey() ? " – auch durch die KI" : ""}.</p>`;
+    ${IN_CLAUDE ? `<div class="notice warn">In der Chat-Version sind Live-Kamera und die Produktdatenbank (Open Food Facts) technisch gesperrt. Ein Barcode wird zwar aus dem Foto gelesen, die Produktdaten lassen sich hier aber nicht abrufen. Fotografiere stattdessen die <b>Nährwerttabelle</b> (Tab „Foto (KI)“) – die KI liest die Werte ab.</div>` : `<p class="muted">Produktdaten stammen aus Open Food Facts (Herstellerangaben vom Etikett, ODbL). Sie werden automatisch auf Plausibilität geprüft${hasKey() ? " – auch durch die KI" : ""}.</p>`}`;
   const vid = $("#vid", p), msg = $("#camMsg", p), out = $("#bcRes", p);
   let stream = null, stopScan = null, busy = false;
 
@@ -239,10 +240,10 @@ function paneBarcode(p) {
 
 // ------------------------------------------------------------------ Foto (KI)
 function panePhoto(p) {
-  if (!hasKey()) {
-    p.innerHTML = `<div class="notice warn"><p><b>Für die Fotoerkennung wird ein Claude-API-Schlüssel benötigt.</b></p>
-      <p>Trage ihn unter <b>Einstellungen → KI</b> ein. Er wird nur auf diesem Gerät gespeichert.</p></div>
-      <p class="sub">Ohne Schlüssel funktionieren Suche, Barcode-Scan und eigene Eingaben weiterhin vollständig.</p>`;
+  if (!hasKey() || !canSendImages()) {
+    p.innerHTML = `<div class="notice warn"><p><b>Fotoerkennung ist gerade nicht verfügbar.</b></p>
+      <p>${esc(hasKey() ? "In dieser Ansicht können keine Bilder an Claude gesendet werden." : aiMissingText())}</p></div>
+      <p class="sub">Suche, Barcode und eigene Eingaben funktionieren weiterhin vollständig.</p>`;
     return;
   }
   p.innerHTML = `
@@ -286,7 +287,7 @@ function panePhoto(p) {
     const localCode = await decodeImageBarcode(prep.img).catch(() => null);
     let analysis;
     try {
-      [analysis] = await Promise.all([analyzeImage(prep.base64, prep.mediaType, $("#hint", p).value.trim())]);
+      analysis = await analyzeImage(prep, $("#hint", p).value.trim());
     } catch (e) {
       step.innerHTML = `<div class="notice bad">${esc(e.message)}</div>` + (localCode ? barcodeOffer(localCode) : "");
       bindBarcodeOffer(step);
@@ -332,7 +333,7 @@ function panePhoto(p) {
     let matches = [];
     try {
       const m = await matchToDatabase(items.map((it) => ({ name: it.name, preparation: it.preparation, grams: it.grams, candidates: it.candidates.map((c) => ({ code: c.source.ref, name: c.name, kcal: Math.round(c.per100.kcal) })) })));
-      matches = m.matches;
+      matches = Array.isArray(m?.matches) ? m.matches : [];
     } catch (e) {
       step.innerHTML = `<div class="notice warn">Automatische Zuordnung fehlgeschlagen (${esc(e.message)}). Bitte unten manuell wählen.</div>`;
     }
@@ -633,7 +634,7 @@ function renderDetail(b, f, opts) {
     catch (e) { aiBox.innerHTML = `<div class="notice bad">KI-Prüfung fehlgeschlagen: ${esc(e.message)} <a href="#" id="retryAI">Erneut</a></div>`; $("#retryAI", aiBox).onclick = (ev) => { ev.preventDefault(); runAI(true); }; }
   };
   if (f.source?.type === "quick") aiBox.innerHTML = "";
-  else if (!hasKey()) aiBox.innerHTML = `<p class="muted">KI-Prüfung verfügbar, sobald ein Claude-API-Schlüssel in den Einstellungen hinterlegt ist.</p>`;
+  else if (!hasKey()) aiBox.innerHTML = `<p class="muted">KI-Prüfung: ${esc(aiMissingText())}</p>`;
   else {
     const cached = cachedVerification(f);
     const mode = getSettings().ai.verify;

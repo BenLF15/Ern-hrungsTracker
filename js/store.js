@@ -1,15 +1,94 @@
-// Lokale Datenhaltung (localStorage). Alles bleibt auf dem Gerät.
+// Lokale Datenhaltung. Standard: localStorage (alles bleibt auf dem Gerät).
+// Im Claude-Chat (Artifact) zusätzlich dauerhaft im privaten Artifact-Speicher
+// (data/users/<id>/…), damit die Einträge nicht verloren gehen.
+import { capability } from "./platform.js";
+
 const P = "nw.v1.";
 
-function read(key, fallback) {
+const ls = {
+  get(k) { try { return localStorage.getItem(P + k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(P + k, v); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(P + k); } catch {} },
+  keys() {
+    const out = [];
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(P)) out.push(k.slice(P.length)); } } catch {}
+    return out;
+  },
+};
+
+// ---- Entfernter Speicher (nur im Chat) ----
+let remote = null; // { coll, data: Map<key, json>, pending: Map, busy: Set }
+const isLocalOnly = (k) => k.startsWith("cache.");
+let syncError = null;
+export function storageMode() { return remote ? "cloud" : "local"; }
+export function lastSyncError() { return syncError; }
+
+async function flush(k) {
+  remote.busy.add(k);
+  while (remote.pending.has(k)) {
+    const v = remote.pending.get(k);
+    remote.pending.delete(k);
+    try {
+      if (v === null) await remote.coll.doc(k).delete();
+      else await remote.coll.doc(k).set({ v, t: Date.now() });
+      syncError = null;
+    } catch (e) {
+      syncError = e?.code === "quota_exceeded" ? "Speicher voll – bitte alte Daten löschen." : "Synchronisierung fehlgeschlagen (" + (e?.code || "Fehler") + ").";
+      console.warn("Sync", k, e);
+    }
+  }
+  remote.busy.delete(k);
+}
+function queueRemote(k, json) {
+  if (!remote || isLocalOnly(k)) return;
+  remote.pending.set(k, json);
+  if (!remote.busy.has(k)) flush(k);
+}
+
+/** Verbindet im Chat mit dem Artifact-Speicher. Gibt true zurück, wenn aktiv. */
+export async function initStore() {
+  const [db, user] = await Promise.all([capability("db"), capability("user")]);
+  if (!db || !user) return false;
+  let id = null;
+  try { id = await user.id(); } catch {}
+  if (!id) return false;
+  const coll = db.collection("data/users/" + id);
+  let snap;
   try {
-    const raw = localStorage.getItem(P + key);
-    return raw == null ? fallback : JSON.parse(raw);
-  } catch { return fallback; }
+    snap = await Promise.race([coll.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
+  } catch { return false; }
+  const data = new Map();
+  for (const d of snap.docs) { const b = d.data(); if (b && typeof b.v === "string") data.set(d.id, b.v); }
+  remote = { coll, data, pending: new Map(), busy: new Set() };
+  // Lokal vorhandene, noch nicht synchronisierte Daten übernehmen
+  for (const k of ls.keys()) {
+    if (isLocalOnly(k) || data.has(k)) continue;
+    const v = ls.get(k);
+    if (v != null) { data.set(k, v); queueRemote(k, v); }
+  }
+  return true;
+}
+
+function rawGet(k) { return remote && !isLocalOnly(k) ? (remote.data.has(k) ? remote.data.get(k) : null) : ls.get(k); }
+function read(key, fallback) {
+  const raw = rawGet(key);
+  if (raw == null) return fallback;
+  try { return JSON.parse(raw); } catch { return fallback; }
 }
 function write(key, value) {
-  try { localStorage.setItem(P + key, JSON.stringify(value)); return true; }
-  catch (e) { console.error("Speichern fehlgeschlagen", e); return false; }
+  const json = JSON.stringify(value);
+  if (remote && !isLocalOnly(key)) { remote.data.set(key, json); queueRemote(key, json); }
+  const ok = ls.set(key, json);
+  return ok || !!remote;
+}
+function del(key) {
+  if (remote && !isLocalOnly(key)) { remote.data.delete(key); queueRemote(key, null); }
+  ls.del(key);
+}
+function allKeys() {
+  const s = new Set(ls.keys());
+  if (remote) for (const k of remote.data.keys()) s.add(k);
+  return [...s];
 }
 
 export const MEALS = [
@@ -51,7 +130,7 @@ export function getDay(key) {
   return d ? { entries: d.entries || [], water: d.water || 0 } : { entries: [], water: 0 };
 }
 export function saveDay(key, day) {
-  if (!day.entries.length && !day.water) { try { localStorage.removeItem(P + "day." + key); } catch {} return; }
+  if (!day.entries.length && !day.water) { del("day." + key); return; }
   write("day." + key, day);
 }
 export function addEntry(key, entry) {
@@ -81,14 +160,7 @@ export function changeWater(key, deltaMl) {
   return day.water;
 }
 export function allDayKeys() {
-  const out = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(P + "day.")) out.push(k.slice((P + "day.").length));
-    }
-  } catch {}
-  return out.sort();
+  return allKeys().filter((k) => k.startsWith("day.")).map((k) => k.slice(4)).sort();
 }
 
 // ---- Zuletzt verwendet & Favoriten ----
@@ -144,12 +216,7 @@ export function cacheSet(ns, key, value) {
 // ---- Export / Import ----
 export function exportAll() {
   const data = {};
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(P)) data[k.slice(P.length)] = JSON.parse(localStorage.getItem(k));
-    }
-  } catch {}
+  for (const k of allKeys()) { if (isLocalOnly(k)) continue; const v = read(k, undefined); if (v !== undefined) data[k] = v; }
   if (data.settings?.ai) data.settings.ai = { ...data.settings.ai, apiKey: "" }; // Schlüssel nie exportieren
   return { app: "naehrwert", version: 1, exported: new Date().toISOString(), data };
 }
@@ -161,9 +228,5 @@ export function importAll(obj) {
   if (!s.ai.apiKey && keep) { s.ai.apiKey = keep; saveSettings(s); }
 }
 export function wipeAll() {
-  try {
-    const ks = [];
-    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(P)) ks.push(k); }
-    ks.forEach((k) => localStorage.removeItem(k));
-  } catch {}
+  for (const k of allKeys()) del(k);
 }

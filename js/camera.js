@@ -1,10 +1,12 @@
 // Kamera: Barcode-Scan (native BarcodeDetector, sonst ZXing) und Fotoaufnahme.
 import { validGtin } from "./off.js";
+import { IN_CLAUDE } from "./platform.js";
 
 let zxingMod = null;
 async function zxing() { return (zxingMod ||= await import("../vendor/zxing.mjs")); }
 
-export function cameraSupported() { return !!navigator.mediaDevices?.getUserMedia; }
+// Im Claude-Chat verweigert der Viewer das Kamera-Livebild – dort nur Datei-Upload/Kamera-App.
+export function cameraSupported() { return !IN_CLAUDE && !!navigator.mediaDevices?.getUserMedia; }
 
 function camError(e) {
   if (!window.isSecureContext) return new Error("Kamera nur über HTTPS (oder localhost) verfügbar.");
@@ -110,6 +112,7 @@ export async function prepareImage(blob, maxSide = 1568) {
     c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     const dataUrl = c.toDataURL("image/jpeg", 0.88);
-    return { dataUrl, base64: dataUrl.split(",")[1], mediaType: "image/jpeg", img };
+    const out = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.88));
+    return { dataUrl, base64: dataUrl.split(",")[1], mediaType: "image/jpeg", img, blob: out };
   } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
 }

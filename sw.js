@@ -1,9 +1,9 @@
 // Service Worker: App-Shell und Datenbank offline verfügbar machen.
-const VERSION = "nw-2026-11-11-1";
+const VERSION = "nw-2026-11-11-2";
 const SHELL = [
   "./", "index.html", "css/app.css", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
   "js/app.js", "js/add.js", "js/ui.js", "js/db.js", "js/store.js", "js/nutrition.js", "js/portions.js",
-  "js/off.js", "js/ai.js", "js/camera.js", "vendor/anthropic-sdk.mjs", "vendor/zxing.mjs", "data/foods.json",
+  "js/off.js", "js/ai.js", "js/camera.js", "js/platform.js", "vendor/anthropic-sdk.mjs", "vendor/zxing.mjs", "data/foods.json",
 ];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

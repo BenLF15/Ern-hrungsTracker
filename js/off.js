@@ -1,6 +1,9 @@
 // Open Food Facts: Produktdaten per Barcode und Online-Suche (Herstellerangaben vom Etikett).
 // Daten: Open Food Facts, Open Database License (ODbL). https://world.openfoodfacts.org
 import { cacheGet, cacheSet } from "./store.js";
+import { IN_CLAUDE } from "./platform.js";
+
+const CHAT_BLOCKED = "Open Food Facts ist in der Chat-Version nicht erreichbar. Fotografiere die Nährwerttabelle (Tab „Foto (KI)“) oder öffne die Web-App.";
 
 const FIELDS = [
   "code", "product_name", "product_name_de", "generic_name_de", "brands", "quantity", "product_quantity",
@@ -66,6 +69,7 @@ export function productToFood(p) {
 }
 
 async function getJSON(url, timeoutMs = 12000) {
+  if (IN_CLAUDE) throw new Error(CHAT_BLOCKED);
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
